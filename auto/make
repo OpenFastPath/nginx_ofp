@@ -17,6 +17,16 @@ mkdir -p $NGX_OBJS/src/core $NGX_OBJS/src/event $NGX_OBJS/src/event/modules \
 ngx_objs_dir=$NGX_OBJS$ngx_regex_dirsep
 ngx_use_pch=`echo $NGX_USE_PCH | sed -e "s/\//$ngx_regex_dirsep/g"`
 
+if [ $OFP_PATH ] && [ $OFP_ODP ]; then
+    ODP_PATH=$OFP_ODP
+else
+    echo "Please define OFP_PATH OFP_ODP environment variable"
+    exit 1
+fi
+
+
+CORE_LIBS="$CORE_LIBS $OFP_PATH/lib/libofp.a $ODP_PATH/lib/libodp.a $ODP_PATH/lib/libodphelper.a"
+CORE_LIBS="$CORE_LIBS $NGX_LIBDL -lrt"
 
 cat << END                                                     > $NGX_MAKEFILE
 
@@ -24,6 +34,11 @@ CC =	$CC
 CFLAGS = $CFLAGS
 CPP =	$CPP
 LINK =	$LINK
+
+
+CFLAGS += -I$OFP_PATH/include
+CFLAGS += -I$ODP_PATH/include
+
 
 END
 

@@ -8,7 +8,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_event.h>
-
+#include <ofp.h>
 
 static ngx_int_t ngx_select_init(ngx_cycle_t *cycle, ngx_msec_t timer);
 static void ngx_select_done(ngx_cycle_t *cycle);
@@ -70,6 +70,22 @@ ngx_module_t  ngx_select_module = {
     NGX_MODULE_V1_PADDING
 };
 
+ofp_fd_set ofp_readfd;
+#define ODP_FD_BITS 30
+#undef FD_SET
+#define FD_SET(fd, fdsetp)      do { \
+				if (fd & (1 << ODP_FD_BITS)) {  \
+				   OFP_FD_SET ((fd & ~(1 << ODP_FD_BITS)) , (ofp_fd_set *)fdsetp) ; \
+				} else { \
+				   OFP_FD_SET (fd , (ofp_fd_set *)fdsetp) ; \
+				} \
+				} while (0)
+
+#undef FD_ISSET
+#define FD_ISSET(fd, fdsetp)    OFP_FD_ISSET((fd & ~(1 << ODP_FD_BITS)), (ofp_fd_set *)fdsetp)
+
+#undef FD_CLR
+#define FD_CLR(fd, fdsetp)      OFP_FD_CLR ((fd & ~(1 << ODP_FD_BITS)), (ofp_fd_set *)fdsetp)
 
 static ngx_int_t
 ngx_select_init(ngx_cycle_t *cycle, ngx_msec_t timer)
@@ -128,8 +144,8 @@ ngx_select_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
 
     c = ev->data;
 
-    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
-                   "select add event fd:%d ev:%i", c->fd, event);
+    ngx_log_debug(NGX_LOG_DEBUG_EVENT, ev->log, 0,
+                   "%s: select add event fd:%d ev:%i", __func__, c->fd, event);
 
     if (ev->index != NGX_INVALID_INDEX) {
         ngx_log_error(NGX_LOG_ALERT, ev->log, 0,
@@ -146,9 +162,15 @@ ngx_select_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
         return NGX_ERROR;
     }
 
-    if (event == NGX_READ_EVENT) {
-        FD_SET(c->fd, &master_read_fd_set);
 
+        ngx_log_debug(NGX_LOG_DEBUG_EVENT, ev->log, 0,
+                      "select %s event fd:%d  event:%d",
+                      ev->write ? "write" : "read", c->fd, event);
+
+    if (event == NGX_READ_EVENT) {
+	if (c->fd & (1<<ODP_FD_BITS)) {
+           FD_SET(c->fd, (ofp_fd_set *)&master_read_fd_set);
+	}
     } else if (event == NGX_WRITE_EVENT) {
         FD_SET(c->fd, &master_write_fd_set);
     }
@@ -157,6 +179,9 @@ ngx_select_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
         max_fd = c->fd;
     }
 
+    ngx_log_debug(NGX_LOG_DEBUG_EVENT, ev->log, 0,
+                      "%s: select event fd:%d  max_fd:%d",
+                       __func__, c->fd, max_fd);
     ev->active = 1;
 
     event_index[nevents] = ev;
@@ -222,6 +247,8 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     if (max_fd == -1) {
         for (i = 0; i < nevents; i++) {
             c = event_index[i]->data;
+        ngx_log_debug(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                       "change max_fd: %i, c->fd : %d", max_fd, c->fd);
             if (max_fd < c->fd) {
                 max_fd = c->fd;
             }
@@ -260,6 +287,11 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     work_read_fd_set = master_read_fd_set;
     work_write_fd_set = master_write_fd_set;
 
+    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                   "select max_fd %d, tp %p ", max_fd, tp);
+    ngx_log_debug2(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+                   " master %p : work %p", (ofp_fd_set *)&master_read_fd_set,
+		   (ofp_fd_set *)&work_read_fd_set);
     ready = select(max_fd + 1, &work_read_fd_set, &work_write_fd_set, NULL, tp);
 
     err = (ready == -1) ? ngx_errno : 0;
