@@ -70,22 +70,80 @@ ngx_module_t  ngx_select_module = {
     NGX_MODULE_V1_PADDING
 };
 
-ofp_fd_set ofp_readfd;
+#define OFP_NOTIFY  1
 #define ODP_FD_BITS 30
 #undef FD_SET
+#define CHK_FD_BIT(fd)          (fd & (1 << ODP_FD_BITS))
+#define CLR_FD_BIT(fd)          (fd & ~(1 << ODP_FD_BITS))
 #define FD_SET(fd, fdsetp)      do { \
-				if (fd & (1 << ODP_FD_BITS)) {  \
-				   OFP_FD_SET ((fd & ~(1 << ODP_FD_BITS)) , (ofp_fd_set *)fdsetp) ; \
+				if (CHK_FD_BIT(fd)) {  \
+				   OFP_FD_SET (CLR_FD_BIT(fd) , (ofp_fd_set *)fdsetp) ; \
 				} else { \
 				   OFP_FD_SET (fd , (ofp_fd_set *)fdsetp) ; \
 				} \
 				} while (0)
 
 #undef FD_ISSET
-#define FD_ISSET(fd, fdsetp)    OFP_FD_ISSET((fd & ~(1 << ODP_FD_BITS)), (ofp_fd_set *)fdsetp)
+#define FD_ISSET(fd, fdsetp)    OFP_FD_ISSET(CLR_FD_BIT(fd), (ofp_fd_set *)fdsetp)
 
 #undef FD_CLR
-#define FD_CLR(fd, fdsetp)      OFP_FD_CLR ((fd & ~(1 << ODP_FD_BITS)), (ofp_fd_set *)fdsetp)
+#define FD_CLR(fd, fdsetp)      OFP_FD_CLR (CLR_FD_BIT(fd), (ofp_fd_set *)fdsetp)
+#if OFP_NOTIFY
+static void sigev_notify(union ofp_sigval sv)
+{
+    struct ofp_sock_sigval *ss = sv.sival_ptr;
+    if (!ss)
+       return ;
+    int s = ss->sockfd;
+    int event = ss->event;
+    odp_packet_t pkt = ss->pkt;
+    ngx_uint_t         i = 0;
+    ngx_queue_t       *queue = NULL;
+    ngx_event_t       *ev;
+    ngx_connection_t  *c;
+
+    if (event == OFP_EVENT_ACCEPT)  {
+        for (i = 0; i < nevents; i++) {
+            ev = event_index[i];
+            c  = ev->data;
+
+            if (ev->accept) {
+                ev->ready = 1;
+                ev->handler(ev);
+                OFP_DBG("%s: posted on ACCEPT EVENT", __func__);
+                break;
+            }
+        }
+    }
+
+    if (event != OFP_EVENT_RECV) {
+        goto end;
+    }
+
+    int r = odp_packet_len(pkt);
+
+    if (r > 0) {
+        for (i = 0; i < nevents; i++) {
+            ev = event_index[i];
+            c  = ev->data;
+            if (s == CLR_FD_BIT(c->fd))  {
+                queue = &ngx_posted_events;
+                ngx_post_event(ev, queue);
+                OFP_DBG("%s: posted on RECV EVENT", __func__);
+                ev->ready = 1;
+                break;
+            }
+        }
+    } else if (r == 0) {
+        odp_packet_free(pkt);
+        ss->pkt = ODP_PACKET_INVALID;
+    }
+
+end:
+    return;
+}
+#endif
+
 
 static ngx_int_t
 ngx_select_init(ngx_cycle_t *cycle, ngx_msec_t timer)
@@ -124,6 +182,27 @@ ngx_select_init(ngx_cycle_t *cycle, ngx_msec_t timer)
 
     max_fd = -1;
 
+#if OFP_NOTIFY
+    ngx_uint_t        i;
+    ngx_listening_t  *ls;
+    struct ofp_sigevent sigev;
+    struct ofp_sock_sigval socksig;
+    ls = cycle->listening.elts;
+    for (i = 0; i < cycle->listening.nelts; i++) {
+        if ((ls[i].listen) && (CHK_FD_BIT(ls[i].fd))) {
+            socksig.sockfd = CLR_FD_BIT(ls[i].fd);
+            socksig.event = 0;
+            socksig.pkt = ODP_PACKET_INVALID;
+            sigev.ofp_sigev_notify = 1;
+            sigev.ofp_sigev_notify_function = sigev_notify;
+            sigev.ofp_sigev_value.sival_ptr = &socksig;
+            ofp_socket_sigevent(&sigev);
+            ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
+                            "Set ofp notity on fd : %d",
+                                        socksig.sockfd);
+        }
+    }
+#endif
     return NGX_OK;
 }
 
@@ -167,13 +246,15 @@ ngx_select_add_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
                       "select %s event fd:%d  event:%d",
                       ev->write ? "write" : "read", c->fd, event);
 
+#if !(OFP_NOTIFY)
     if (event == NGX_READ_EVENT) {
-	if (c->fd & (1<<ODP_FD_BITS)) {
-           FD_SET(c->fd, (ofp_fd_set *)&master_read_fd_set);
+	if (CHK_FD_BIT(c->fd)) {
+            FD_SET(c->fd, (ofp_fd_set *)&master_read_fd_set);
 	}
     } else if (event == NGX_WRITE_EVENT) {
         FD_SET(c->fd, &master_write_fd_set);
     }
+#endif
 
     if (max_fd != -1 && max_fd < c->fd) {
         max_fd = c->fd;
@@ -209,12 +290,14 @@ ngx_select_del_event(ngx_event_t *ev, ngx_int_t event, ngx_uint_t flags)
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, ev->log, 0,
                    "select del event fd:%d ev:%i", c->fd, event);
 
+#if !OFP_NOTIFY
     if (event == NGX_READ_EVENT) {
         FD_CLR(c->fd, &master_read_fd_set);
 
     } else if (event == NGX_WRITE_EVENT) {
         FD_CLR(c->fd, &master_write_fd_set);
     }
+#endif
 
     if (max_fd == c->fd) {
         max_fd = -1;
@@ -236,6 +319,9 @@ static ngx_int_t
 ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_uint_t flags)
 {
+#if OFP_NOTIFY
+    return NGX_OK;
+#endif
     int                ready, nready;
     ngx_err_t          err;
     ngx_uint_t         i, found;

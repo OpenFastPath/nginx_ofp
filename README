@@ -1,0 +1,188 @@
+				README
+			      ==========
+		
+
+0. Prerequisites
+1. Preparing build
+2. Configuring NGINX 
+3. Running NGINX
+4. Limitations or Known Issues
+5. Changelog
+
+
+0. Prerequisites
+================
+
+Download ODP (Version 1.3 or 1.4) and latest OFP code. Have these compiled and installed in some out directory
+
+1. Preparing build
+==================
+
+set build variables with respective OFP and odp build path
+export OFP_PATH=/home/kapilhali/odp/ofp/ofp/out
+export OFP_ODP=/home/kapilhali/odp/odp/out
+
+./configure --sbin-path=/usr/local/nginx/nginx --conf-path=/usr/local/nginx/nginx.conf --pid-path=/usr/local/nginx/nginx.pid --with-http_ssl_module --with-debug --with-select_module
+
+
+make install
+
+Note: make clean will remove main Makefile and obj dir. So configure shall be run again. 
+It would be useful to save the above build steps in a script and run the script.
+
+2. Configuring NGINX 
+====================
+
+After build and install, NGINX configuration file will be at /usr/local/nginx/nginx.conf 
+Change as mentioned below.
+
+-----
+diff --git a/conf/nginx.conf b/conf/nginx.conf
+index 29bc085..8421146 100644
+--- a/conf/nginx.conf
++++ b/conf/nginx.conf
+@@ -5,12 +5,14 @@ worker_processes  1;
+ #error_log  logs/error.log;
+ #error_log  logs/error.log  notice;
+ #error_log  logs/error.log  info;
++#error_log  logs/error.log  debug;
+ 
+ #pid        logs/nginx.pid;
+-
++daemon off;
+ 
+ events {
+     worker_connections  1024;
++    use select;
+ }
+
+
+@@ -27,8 +30,8 @@ http {
+     sendfile        on;
+     #tcp_nopush     on;
+ 
+-    #keepalive_timeout  0;
+-    keepalive_timeout  65;
++    keepalive_timeout  0;
++    #keepalive_timeout  65;
+ 
+     #gzip  on;
+
+-----
+
+To get NGINX debug logs uncomment the debug line
+ error_log  logs/error.log  debug
+
+Debug logs will be in /usr/local/nginx/logs/error.log
+
+
+3. Running NGINX
+================
+
+In conf/ofp.conf file, configure the ip address for fp0 interface.
+
+Enable hugepages for ODP using the command below
+
+echo 1024 > /proc/sys/vm/nr_hugepages
+
+Below is start_nginx.sh script
+
+-----
+
+root@Linaro:/home/nginx# cat start_nginx.sh 
+#!/bin/bash
+
+app="nginx"
+
+if [ "$#" -ne 1 ]; then
+    echo "requires interface parameter. Use: ./start_$app.sh ethX"
+    exit -1
+fi
+
+intf=$1
+echo Starting $app on interface $intf
+
+/usr/local/nginx/nginx &
+
+#sleep 1
+#ifconfig fp0 $2
+#sleep 1
+
+iptables -A FORWARD -i $intf -j DROP
+iptables -A INPUT -i $intf -j DROP
+ip6tables -A FORWARD -i $intf -j DROP
+ip6tables -A INPUT -i $intf -j DROP
+ifconfig $intf -arp
+ip addr flush dev $intf
+
+-----
+
+
+Below is stop_nginx.sh script
+
+-----
+
+root@Linaro:/home/nginx# cat stop_nginx.sh 
+#!/bin/bash
+if [ "$#" -ne 1 ]; then
+    echo "requires an interface parameter. Use: ./start_webserver.sh ethX"
+    exit -1
+fi
+
+intf=$1
+if test "X$intf" = "X"; then intf=eth0; fi
+
+app="nginx"
+echo "Stopping $app"
+
+kill -9 `cat /usr/local/nginx/nginx.pid`
+
+ps -eL | grep nginx | awk '{print $1}' | xargs kill -9
+
+ifconfig $intf down
+iptables -D FORWARD -i $intf -j DROP
+iptables -D INPUT - i $intf -j DROP
+ip6tables -D FORWARD -i $intf -j DROP
+ip6tables -D INPUT -i $intf -j DROP
+ifconfig $intf arp
+
+ifconfig eth0 192.168.1.4/24 up
+mv /usr/local/nginx/nginx.pid /usr/local/nginx/nginx.pid.bk
+
+----
+
+To start webserver
+
+root@Linaro:/home/nginx# sh start_nginx.sh eth0
+
+To stop webserver 
+
+root@Linaro:/home/nginx# sh stop_nginx.sh eth0
+
+
+From some other machine try to ping the IP we have set for fp0 interface.
+If ping works, then open a web browser and try to access the same ip address.
+If web page loads successfully, webserver with OFP is working.
+
+
+
+4. Limitations or Known Issues
+==============================
+
+a) Current NGINX/OFP implementation assumes interface as eth0. 
+It will not work for other interfaces.
+
+b) Running with keepalive timeout other than zero causing issue
+while more connection requests are triggered. To avoid this
+Configure keepalive_timeout to zero in conf file.
+
+
+5. Changelog
+============
+
+Made changes to utilise the OFP event signaling support for handling
+socket operation like accept and recieve calls on a fd. 
+In ngx_select_module.c file, macro OFP_NOTIFY is enabled to use this 
+implementation. 
+If macro is set to zero, can use older select() implementation.
+

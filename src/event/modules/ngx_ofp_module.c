@@ -140,7 +140,7 @@ int my_webserver(int if_count, char **if_name)
 	if (core_count > 1)
 		num_workers--;
 
-	num_workers = odp_cpumask_def_worker(&cpumask, num_workers);
+	num_workers = odp_cpumask_default_worker(&cpumask, num_workers);
 	odp_cpumask_to_str(&cpumask, cpumaskstr, sizeof(cpumaskstr));
 
 	printf("Num worker threads: %i\n", num_workers);

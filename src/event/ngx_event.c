@@ -243,8 +243,8 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 
     delta = ngx_current_msec - delta;
 
-    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
-                   "timer delta: %M", delta);
+//    ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
+//                   "timer delta: %M", delta);
 
     ngx_event_process_posted(cycle, &ngx_posted_accept_events);
 
