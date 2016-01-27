@@ -320,6 +320,35 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_uint_t flags)
 {
 #if OFP_NOTIFY
+	odp_event_t odp_ev;
+	odp_packet_t pkt;
+	odp_queue_t in_queue;
+	odp_event_t events[OFP_PKT_SCHED_MULTI_EVENT_SIZE];
+	int event_idx = 0;
+	int event_cnt = 0;
+
+	event_cnt = odp_schedule_multi(&in_queue, ODP_SCHED_WAIT,
+			 events, OFP_PKT_SCHED_MULTI_EVENT_SIZE);
+	for (event_idx = 0; event_idx < event_cnt; event_idx++) {
+		odp_ev = events[event_idx];
+
+		if (odp_ev == ODP_EVENT_INVALID)
+			continue;
+
+		if (odp_event_type(odp_ev) == ODP_EVENT_TIMEOUT) {
+			ofp_timer_handle(odp_ev);
+			continue;
+		}
+
+		if (odp_event_type(odp_ev) == ODP_EVENT_PACKET) {
+			pkt = odp_packet_from_event(odp_ev);
+			ofp_packet_input(pkt, in_queue, ofp_eth_vlan_processing);
+			continue;
+		}
+
+		OFP_ERR("Unexpected event type: %u", odp_event_type(odp_ev));
+	}
+
     return NGX_OK;
 #endif
     int                ready, nready;

@@ -158,11 +158,11 @@ int my_webserver(int if_count, char **if_name)
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 	/* Start dataplane dispatcher worker threads */
 
-	odph_linux_pthread_create(thread_tbl,
+/*	odph_linux_pthread_create(thread_tbl,
 				  &cpumask,
 				  default_event_dispatcher,
 				  ofp_eth_vlan_processing);
-
+*/
 	/* other app code here.*/
 	/* Start CLI */
 	ofp_start_cli_thread(app_init_params.linux_core_id, params.conf_file);
