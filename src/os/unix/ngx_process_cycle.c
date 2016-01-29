@@ -10,6 +10,8 @@
 #include <ngx_event.h>
 #include <ngx_channel.h>
 
+#include "odp.h"
+#include "ofp.h"
 
 static void ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n,
     ngx_int_t type);
@@ -728,6 +730,11 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 {
     ngx_int_t worker = (intptr_t) data;
 
+    if (odp_init_local(ODP_THREAD_WORKER))
+        return;
+    if (ofp_init_local())
+        return;
+
     ngx_process = NGX_PROCESS_WORKER;
     ngx_worker = worker;
 
@@ -1099,6 +1106,10 @@ ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data)
 
     void         *ident[4];
     ngx_event_t   ev;
+    if (odp_init_local(ODP_THREAD_WORKER))
+        return;
+    if (ofp_init_local())
+        return;
 
     /*
      * Set correct process type since closing listening Unix domain socket

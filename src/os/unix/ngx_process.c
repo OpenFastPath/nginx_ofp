@@ -10,6 +10,8 @@
 #include <ngx_event.h>
 #include <ngx_channel.h>
 
+#include "odp.h"
+#include "odp/helper/linux.h"
 
 typedef struct {
     int     signo;
@@ -182,11 +184,13 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
 
     ngx_process_slot = s;
 
+    odph_linux_process_t odph_proc[1];
+    static int cpu_index = 0;
 
-    pid = vfork();
+    pid = (ngx_pid_t) odph_linux_process_fork(odph_proc, ++cpu_index);
 
     switch (pid) {
-
+    case -2:
     case -1:
         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
                       "fork() failed while spawning \"%s\"", name);
@@ -194,7 +198,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
         return NGX_INVALID_PID;
 
     case 0:
-        ngx_pid = ngx_getpid();
+        ngx_pid = odph_proc->pid;
         proc(cycle, data);
         break;
 
