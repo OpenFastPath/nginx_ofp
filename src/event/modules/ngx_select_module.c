@@ -70,7 +70,7 @@ ngx_module_t  ngx_select_module = {
     NGX_MODULE_V1_PADDING
 };
 
-#define OFP_NOTIFY  1
+#define OFP_NOTIFY  0
 #define ODP_FD_BITS 30
 #undef FD_SET
 #define CHK_FD_BIT(fd)          (fd & (1 << ODP_FD_BITS))
@@ -319,7 +319,6 @@ static ngx_int_t
 ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_uint_t flags)
 {
-#if OFP_NOTIFY
 	odp_event_t odp_ev;
 	odp_packet_t pkt;
 	odp_queue_t in_queue;
@@ -349,6 +348,7 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 		OFP_ERR("Unexpected event type: %u", odp_event_type(odp_ev));
 	}
 
+#if OFP_NOTIFY
     return NGX_OK;
 #endif
     int                ready, nready;
