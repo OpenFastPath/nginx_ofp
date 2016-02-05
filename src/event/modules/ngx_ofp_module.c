@@ -325,7 +325,10 @@ int socket(int domain, int type, int protocol)
 	return rc;
 	}
 
-	rc = ofp_socket(domain, type, protocol);
+	if (AF_INET == domain && SOCK_STREAM == type)
+		rc = ofp_socket(OFP_AF_INET, OFP_SOCK_STREAM, OFP_IPPROTO_TCP);
+	else
+		rc = ofp_socket(domain, type, protocol);
 	rc |= 1 << ODP_FD_BITS;
 
 	if (ofp_fd == 0)
@@ -358,16 +361,9 @@ int select (int nfds, fd_set *readfds, fd_set *writefds,
 	int rc = 0;
 	if (nfds & (1 << ODP_FD_BITS)) {
 		struct ofp_timeval __timeout;
-		if (timeout == NULL) {
-			__timeout.tv_sec = 0;
-			__timeout.tv_usec = 200000;
-		} else {
-			__timeout.tv_sec = timeout->tv_sec;
-			__timeout.tv_usec = timeout->tv_usec;
-		}
 
 		__timeout.tv_sec = 0;
-		__timeout.tv_usec = 200000;
+		__timeout.tv_usec = 0;
 
 		ofp_fd_set *__readfds = NULL, *__writefds = NULL;
 		ofp_fd_set *__exceptfds = NULL;
@@ -385,13 +381,9 @@ int select (int nfds, fd_set *readfds, fd_set *writefds,
 		}
 
 		nfds &= ~(1 << ODP_FD_BITS);
-		while (rc <= 0)
-		{
-			rc = ofp_select(nfds, __readfds, __writefds,
-					__exceptfds, &__timeout);
-			if (rc < 0)
-				printf("ofp_errno : %d", ofp_errno);
-		}
+
+		rc = ofp_select(nfds, __readfds, __writefds,
+				__exceptfds, &__timeout);
 	} else {
 		rc = real_select(nfds, readfds, writefds, exceptfds, timeout);
 	}
@@ -427,8 +419,9 @@ int ioctl(int fd, int request, void *p)
 
 	if (fd & (1 << ODP_FD_BITS)) {
 		fd &= ~(1 << ODP_FD_BITS);
-		return 0;
-		ret = ofp_ioctl(fd, request, p);
+
+		ret = ofp_ioctl(fd, OFP_FIONBIO, p);
+
 		if (ofp_errno == OFP_EOPNOTSUPP)
 			ret = 0;
 		return ret;

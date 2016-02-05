@@ -18,7 +18,7 @@ static ngx_int_t ngx_select_del_event(ngx_event_t *ev, ngx_int_t event,
     ngx_uint_t flags);
 static ngx_int_t ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_uint_t flags);
-static void ngx_select_repair_fd_sets(ngx_cycle_t *cycle);
+/*static void ngx_select_repair_fd_sets(ngx_cycle_t *cycle);*/
 static char *ngx_select_init_conf(ngx_cycle_t *cycle, void *conf);
 
 
@@ -326,7 +326,7 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 	int event_idx = 0;
 	int event_cnt = 0;
 
-	event_cnt = odp_schedule_multi(&in_queue, ODP_SCHED_WAIT,
+	event_cnt = odp_schedule_multi(&in_queue, ODP_SCHED_NO_WAIT,
 			 events, OFP_PKT_SCHED_MULTI_EVENT_SIZE);
 	for (event_idx = 0; event_idx < event_cnt; event_idx++) {
 		odp_ev = events[event_idx];
@@ -347,7 +347,6 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 
 		OFP_ERR("Unexpected event type: %u", odp_event_type(odp_ev));
 	}
-
 #if OFP_NOTIFY
     return NGX_OK;
 #endif
@@ -437,13 +436,14 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
         ngx_log_error(level, cycle->log, err, "select() failed");
 
         if (err == NGX_EBADF) {
-            ngx_select_repair_fd_sets(cycle);
+            /*ngx_select_repair_fd_sets(cycle);*/
         }
 
         return NGX_ERROR;
     }
 
     if (ready == 0) {
+return NGX_OK;
         if (timer != NGX_TIMER_INFINITE) {
             return NGX_OK;
         }
@@ -488,16 +488,16 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     }
 
     if (ready != nready) {
-        ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
+        /*ngx_log_error(NGX_LOG_ALERT, cycle->log, 0,
                       "select ready != events: %d:%d", ready, nready);
 
-        ngx_select_repair_fd_sets(cycle);
+        ngx_select_repair_fd_sets(cycle);*/
     }
 
     return NGX_OK;
 }
 
-
+/*
 static void
 ngx_select_repair_fd_sets(ngx_cycle_t *cycle)
 {
@@ -544,7 +544,7 @@ ngx_select_repair_fd_sets(ngx_cycle_t *cycle)
 
     max_fd = -1;
 }
-
+*/
 
 static char *
 ngx_select_init_conf(ngx_cycle_t *cycle, void *conf)
