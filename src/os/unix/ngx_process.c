@@ -12,6 +12,7 @@
 
 #include "odp.h"
 #include "odp/helper/linux.h"
+#include "ofp.h"
 
 typedef struct {
     int     signo;
@@ -27,7 +28,7 @@ static void ngx_signal_handler(int signo);
 static void ngx_process_get_status(void);
 static void ngx_unlock_mutexes(ngx_pid_t pid);
 
-
+static int 	queue_count = -1;
 int              ngx_argc;
 char           **ngx_argv;
 char           **ngx_os_argv;
@@ -186,6 +187,25 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
 
     odph_linux_process_t odph_proc[1];
     static int cpu_index = 0;
+    odp_pktin_queue_t in_queues[OFP_PKTIN_QUEUE_MAX];
+    int num_queues = 0;
+    odp_pktio_t pktio;
+    char *dev=malloc(2);
+    strncpy(dev, "0", 2);
+
+    pktio = odp_pktio_lookup(dev);
+    if (pktio == ODP_PKTIO_INVALID) {
+           OFP_ERR("Failed to locate pktio");
+           exit(EXIT_FAILURE);
+    }
+
+    num_queues = odp_pktin_queue(pktio, in_queues, OFP_PKTIN_QUEUE_MAX);
+
+    if (num_queues < 1 )
+           OFP_ERR("Uneven number of queues: %d", num_queues);
+
+    if (queue_count < num_queues)
+           queue_count++;
 
     pid = (ngx_pid_t) odph_linux_process_fork(odph_proc, ++cpu_index);
 
@@ -198,6 +218,10 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
         return NGX_INVALID_PID;
 
     case 0:
+
+        in_queue = in_queues[queue_count];
+        OFP_ERR("queue_count is: %d, in_queues index is: %d, in_queue.index: %d", queue_count, in_queues[queue_count].index, in_queue.index);
+
         ngx_pid = odph_proc->pid;
         proc(cycle, data);
         break;

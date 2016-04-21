@@ -70,7 +70,7 @@ ngx_module_t  ngx_select_module = {
     NGX_MODULE_V1_PADDING
 };
 
-#define OFP_NOTIFY  0
+#define OFP_NOTIFY  1
 #define ODP_FD_BITS 30
 #undef FD_SET
 #define CHK_FD_BIT(fd)          (fd & (1 << ODP_FD_BITS))
@@ -319,7 +319,7 @@ static ngx_int_t
 ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_uint_t flags)
 {
-	odp_event_t odp_ev;
+	/*odp_event_t odp_ev;
 	odp_packet_t pkt;
 	odp_queue_t in_queue;
 	odp_event_t events[OFP_EVT_RX_BURST_SIZE];
@@ -346,7 +346,29 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 		}
 
 		OFP_ERR("Unexpected event type: %u", odp_event_type(odp_ev));
-	}
+	}*/
+
+	odp_packet_t pkts[OFP_PKT_RX_BURST_SIZE];
+        odp_packet_t odp_pkt;
+        int pkt_cnt = 0;
+        int pkt_idx = 0;
+
+	pkt_cnt = odp_pktio_recv_queue(in_queue, pkts, OFP_PKT_RX_BURST_SIZE);
+
+	/*if (pkt_cnt >= 1)
+		printf("my pid: %d, queue index: %d\n", getpid(), in_queue.index);*/
+
+        for (pkt_idx = 0; pkt_idx < pkt_cnt; pkt_idx++) {
+                odp_pkt = pkts[pkt_idx];
+                if (odp_unlikely(odp_packet_has_error(odp_pkt))) {
+                        odp_packet_free(odp_pkt);
+                        continue;
+                } else {
+
+                        ofp_packet_input(odp_pkt, ODP_QUEUE_INVALID, ofp_eth_vlan_processing);
+                        continue;
+                }
+        }
 #if OFP_NOTIFY
     return NGX_OK;
 #endif

@@ -44,6 +44,7 @@
 #include <sys/syscall.h>
 #include <dlfcn.h>
 
+#define NUM_QUEUES 1
 #define ODP_FD_BITS 30
 
 #include <getopt.h>
@@ -101,9 +102,12 @@ int my_webserver(int if_count, char **if_name)
 {
 	odph_linux_pthread_t thread_tbl[MAX_WORKERS];
 	appl_args_t params;
-	int core_count, num_workers;
+	int core_count, num_workers, i;
 	odp_cpumask_t cpumask;
 	char cpumaskstr[64];
+	odp_pktio_param_t pktio_param;
+        odp_pktin_queue_param_t pktin_param;
+        odp_pktout_queue_param_t pktout_param;
 
 	struct rlimit rlp;
 	getrlimit(RLIMIT_CORE, &rlp);
@@ -147,13 +151,39 @@ int my_webserver(int if_count, char **if_name)
 	printf("first CPU:          %i\n", odp_cpumask_first(&cpumask));
 	printf("cpu mask:           %s\n", cpumaskstr);
 
-	app_init_params.if_count = params.if_count;
-	app_init_params.if_names = params.if_names;
+	app_init_params.if_count = 0;
+	app_init_params.if_names = 0;
 	app_init_params.pkt_hook[OFP_HOOK_LOCAL] = fastpath_local_hook;
+	/*app_init_params.burst_recv_mode = 1;*/
 	if(ofp_init_global(&app_init_params) < 0) {
 		printf("%s: ofp_init_global failed\n", __func__);
 		exit(0);
 	}
+
+	odp_pktio_param_init(&pktio_param);
+        pktio_param.in_mode = ODP_PKTIN_MODE_DIRECT;
+        pktio_param.out_mode = ODP_PKTOUT_MODE_DIRECT;
+
+        odp_pktin_queue_param_init(&pktin_param);
+        pktin_param.op_mode = ODP_PKTIO_OP_MT_UNSAFE;
+        pktin_param.hash_enable = 1;
+        pktin_param.hash_proto.all_bits = 7;
+        pktin_param.num_queues = NUM_QUEUES;
+
+        odp_pktout_queue_param_init(&pktout_param);
+        pktout_param.num_queues = odp_cpu_count();
+        pktout_param.op_mode = ODP_PKTIO_OP_MT_UNSAFE;
+
+        for (i = 0; i < params.if_count; i++) {
+                if (ofp_ifnet_create(params.if_names[i],
+                                &pktio_param,
+                                &pktin_param,
+                                &pktout_param) < 0) {
+                        OFP_ERR("Failed to init interface %s",
+                                params.if_names[i]);
+                        exit(EXIT_FAILURE);
+                }
+        }
 
 	memset(thread_tbl, 0, sizeof(thread_tbl));
 	/* Start dataplane dispatcher worker threads */
@@ -306,8 +336,8 @@ void ngx_ofp_init()
 	INIT_FUNCTION(writev);
 #undef INIT_FUNCTION
 
-	char *p=malloc(5);
-	strncpy(p, "eth0", 5);
+	char *p=malloc(2);
+	strncpy(p, "0", 2);
 	my_webserver(1, &p);
 
 	rc = 0;
