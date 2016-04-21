@@ -26,6 +26,7 @@ typedef struct {
 
 #endif
 
+extern odp_instance_t instance;
 
 struct ngx_event_s {
     void            *data;

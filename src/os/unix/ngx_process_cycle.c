@@ -730,7 +730,7 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 {
     ngx_int_t worker = (intptr_t) data;
 
-    if (odp_init_local(ODP_THREAD_WORKER))
+    if (odp_init_local(instance, ODP_THREAD_WORKER))
         return;
     if (ofp_init_local())
         return;
@@ -1106,7 +1106,7 @@ ngx_cache_manager_process_cycle(ngx_cycle_t *cycle, void *data)
 
     void         *ident[4];
     ngx_event_t   ev;
-    if (odp_init_local(ODP_THREAD_WORKER))
+    if (odp_init_local(instance, ODP_THREAD_WORKER))
         return;
     if (ofp_init_local())
         return;

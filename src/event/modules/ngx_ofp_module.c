@@ -51,6 +51,8 @@
 
 #define MAX_WORKERS 32
 
+odp_instance_t instance;
+
 /**
  * Parsed command line application arguments
  */
@@ -119,11 +121,11 @@ int my_webserver(int if_count, char **if_name)
 	/* Print both system and application information */
 	print_info("webserver", &params);
 
-	if (odp_init_global(NULL, NULL)) {
+	if (odp_init_global(&instance, NULL, NULL)) {
 		OFP_ERR("Error: ODP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
-	odp_init_local(ODP_THREAD_CONTROL);
+	odp_init_local(instance, ODP_THREAD_CONTROL);
 
 	core_count = odp_cpu_count();
 	num_workers = core_count;
@@ -155,7 +157,7 @@ int my_webserver(int if_count, char **if_name)
 	app_init_params.if_names = 0;
 	app_init_params.pkt_hook[OFP_HOOK_LOCAL] = fastpath_local_hook;
 	/*app_init_params.burst_recv_mode = 1;*/
-	if(ofp_init_global(&app_init_params) < 0) {
+	if(ofp_init_global(instance, &app_init_params) < 0) {
 		printf("%s: ofp_init_global failed\n", __func__);
 		exit(0);
 	}
@@ -175,7 +177,8 @@ int my_webserver(int if_count, char **if_name)
         pktout_param.op_mode = ODP_PKTIO_OP_MT_UNSAFE;
 
         for (i = 0; i < params.if_count; i++) {
-                if (ofp_ifnet_create(params.if_names[i],
+                if (ofp_ifnet_create(instance,
+                                params.if_names[i],
                                 &pktio_param,
                                 &pktin_param,
                                 &pktout_param) < 0) {
@@ -195,7 +198,7 @@ int my_webserver(int if_count, char **if_name)
 */
 	/* other app code here.*/
 	/* Start CLI */
-	ofp_start_cli_thread(app_init_params.linux_core_id, params.conf_file);
+	ofp_start_cli_thread(instance, app_init_params.linux_core_id, params.conf_file);
 
 	OFP_INFO("HTTP thread started");
 

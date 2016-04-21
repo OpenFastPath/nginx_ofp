@@ -190,6 +190,7 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
     odp_pktin_queue_t in_queues[OFP_PKTIN_QUEUE_MAX];
     int num_queues = 0;
     odp_pktio_t pktio;
+    odph_linux_thr_params_t thr_params;
     char *dev=malloc(2);
     strncpy(dev, "0", 2);
 
@@ -199,6 +200,8 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
            exit(EXIT_FAILURE);
     }
 
+    free(dev);
+
     num_queues = odp_pktin_queue(pktio, in_queues, OFP_PKTIN_QUEUE_MAX);
 
     if (num_queues < 1 )
@@ -207,7 +210,12 @@ ngx_spawn_process(ngx_cycle_t *cycle, ngx_spawn_proc_pt proc, void *data,
     if (queue_count < num_queues)
            queue_count++;
 
-    pid = (ngx_pid_t) odph_linux_process_fork(odph_proc, ++cpu_index);
+
+    memset(&thr_params, 0, sizeof(thr_params));
+    thr_params.thr_type = ODP_THREAD_WORKER;
+    thr_params.instance = instance;
+
+    pid = (ngx_pid_t) odph_linux_process_fork(odph_proc, ++cpu_index, &thr_params);
 
     switch (pid) {
     case -2:

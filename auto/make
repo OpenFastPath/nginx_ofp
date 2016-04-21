@@ -25,8 +25,8 @@ else
 fi
 
 
-CORE_LIBS="$CORE_LIBS $OFP_PATH/lib/libofp.a $ODP_PATH/lib/libodp.a $ODP_PATH/lib/libodphelper.a"
-CORE_LIBS="$CORE_LIBS $NGX_LIBDL -lrt"
+CORE_LIBS="$CORE_LIBS $OFP_PATH/lib/libofp.a $ODP_PATH/lib/libodp-dpdk.a $ODP_PATH/lib/libodphelper-linux.a -L=$RTE_SDK/$RTE_TARGET/lib/ -ldpdk -lpcap"
+CORE_LIBS="$CORE_LIBS $NGX_LIBDL -lrt -lm"
 
 cat << END                                                     > $NGX_MAKEFILE
 
