@@ -317,56 +317,29 @@ static ngx_int_t
 ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_uint_t flags)
 {
-	/*odp_event_t odp_ev;
-	odp_packet_t pkt;
-	odp_queue_t in_queue;
-	odp_event_t events[OFP_EVT_RX_BURST_SIZE];
-	int event_idx = 0;
-	int event_cnt = 0;
-
-	event_cnt = odp_schedule_multi(&in_queue, ODP_SCHED_NO_WAIT,
-			 events, OFP_EVT_RX_BURST_SIZE);
-	for (event_idx = 0; event_idx < event_cnt; event_idx++) {
-		odp_ev = events[event_idx];
-
-		if (odp_ev == ODP_EVENT_INVALID)
-			continue;
-
-		if (odp_event_type(odp_ev) == ODP_EVENT_TIMEOUT) {
-			ofp_timer_handle(odp_ev);
-			continue;
-		}
-
-		if (odp_event_type(odp_ev) == ODP_EVENT_PACKET) {
-			pkt = odp_packet_from_event(odp_ev);
-			ofp_packet_input(pkt, in_queue, ofp_eth_vlan_processing);
-			continue;
-		}
-
-		OFP_ERR("Unexpected event type: %u", odp_event_type(odp_ev));
-	}*/
-
 	odp_packet_t pkts[OFP_PKT_RX_BURST_SIZE];
         odp_packet_t odp_pkt;
         int pkt_cnt = 0;
         int pkt_idx = 0;
 
-	pkt_cnt = odp_pktio_recv_queue(in_queue, pkts, OFP_PKT_RX_BURST_SIZE);
-
-	/*if (pkt_cnt >= 1)
-		printf("my pid: %d, queue index: %d\n", getpid(), in_queue.index);*/
+	pkt_cnt = odp_pktin_recv(in_queue, pkts, OFP_PKT_RX_BURST_SIZE);
 
         for (pkt_idx = 0; pkt_idx < pkt_cnt; pkt_idx++) {
                 odp_pkt = pkts[pkt_idx];
-                if (odp_unlikely(odp_packet_has_error(odp_pkt))) {
-                        odp_packet_free(odp_pkt);
-                        continue;
-                } else {
-
-                        ofp_packet_input(odp_pkt, ODP_QUEUE_INVALID, ofp_eth_vlan_processing);
-                        continue;
-                }
+                ofp_packet_input(odp_pkt, ODP_QUEUE_INVALID, ofp_eth_vlan_processing);
         }
+
+	odp_queue_t timer_queue = ofp_timer_queue_cpu(odp_cpu_id());
+	odp_event_t event = odp_queue_deq(timer_queue);
+
+	if (event != ODP_EVENT_INVALID) {
+		if (odp_event_type(event) == ODP_EVENT_TIMEOUT) {
+			ofp_timer_handle(event);
+		} else {
+			odp_buffer_free(odp_buffer_from_event(event));
+		}
+	}
+
 #if OFP_NOTIFY
     return NGX_OK;
 #endif
