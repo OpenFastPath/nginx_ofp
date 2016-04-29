@@ -24,8 +24,6 @@ static char *ngx_select_init_conf(ngx_cycle_t *cycle, void *conf);
 
 static fd_set         master_read_fd_set;
 static fd_set         master_write_fd_set;
-static fd_set         work_read_fd_set;
-static fd_set         work_write_fd_set;
 
 static ngx_int_t      max_fd;
 static ngx_uint_t     nevents;
@@ -420,15 +418,12 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                    "select timer: %M", timer);
 
-    work_read_fd_set = master_read_fd_set;
-    work_write_fd_set = master_write_fd_set;
-
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                    "select max_fd %d, tp %p ", max_fd, tp);
     ngx_log_debug2(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                    " master %p : work %p", (ofp_fd_set *)&master_read_fd_set,
 		   (ofp_fd_set *)&work_read_fd_set);
-    ready = select(max_fd + 1, &work_read_fd_set, &work_write_fd_set, NULL, tp);
+    ready = select(max_fd + 1, &master_read_fd_set, &master_write_fd_set, NULL, tp);
 
     err = (ready == -1) ? ngx_errno : 0;
 
@@ -483,14 +478,14 @@ return NGX_OK;
         found = 0;
 
         if (ev->write) {
-            if (FD_ISSET(c->fd, &work_write_fd_set)) {
+            if (FD_ISSET(c->fd, &master_write_fd_set)) {
                 found = 1;
                 ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                                "select write %d", c->fd);
             }
 
         } else {
-            if (FD_ISSET(c->fd, &work_read_fd_set)) {
+            if (FD_ISSET(c->fd, &master_read_fd_set)) {
                 found = 1;
                 ngx_log_debug1(NGX_LOG_DEBUG_EVENT, cycle->log, 0,
                                "select read %d", c->fd);
