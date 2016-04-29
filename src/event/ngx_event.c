@@ -9,6 +9,7 @@
 #include <ngx_core.h>
 #include <ngx_event.h>
 
+#include "ofp.h"
 
 #define DEFAULT_CONNECTIONS  512
 
@@ -196,7 +197,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
     ngx_uint_t  flags;
     ngx_msec_t  timer, delta;
 
-    if (ngx_timer_resolution) {
+    if (1) {
         timer = NGX_TIMER_INFINITE;
         flags = 0;
 
@@ -580,7 +581,8 @@ ngx_event_process_init(ngx_cycle_t *cycle)
     ecf = ngx_event_get_conf(cycle->conf_ctx, ngx_event_core_module);
 
     if (ccf->master && ccf->worker_processes > 1 && ecf->accept_mutex) {
-        ngx_use_accept_mutex = 1;
+        ngx_use_accept_mutex = 0;
+OFP_ERR("ngx_use_accept_mutex = 0\n");
         ngx_accept_mutex_held = 0;
         ngx_accept_mutex_delay = ecf->accept_mutex_delay;
 
