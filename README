@@ -13,56 +13,76 @@
 0. Prerequisites
 ================
 
-Download ODP (Version 1.3 or 1.4) and latest OFP code. Have these compiled and installed in some out directory
+0.1. Get latest OFP to your $PATH_OFP_ROOT and run ./scripts/devbuild_ofp_odp_dpdk.sh
+This builds and installs DPDK, ODP-DPDK and OFP.
 
-Below patch shall be applied to OFP code, to have the huge no. of conns per sec.
------
+0.2. Configure DPDK:
 
-diff --git a/include/api/ofp_config.h b/include/api/ofp_config.h
-index 163280a..4a842d9 100644
---- a/include/api/ofp_config.h
-+++ b/include/api/ofp_config.h
-@@ -59,14 +59,16 @@
- /* Configure values */
+ls /sys/devices/system/node/
+sudo sh -c 'echo 1024 > /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages'
+sudo sh -c 'echo 1024 > /sys/devices/system/node/node1/hugepages/hugepages-2048kB/nr_hugepages'
 
- /** Packet pool size. */
--#define SHM_PKT_POOL_SIZE              (512*2048)
-+#define SHM_PKT_POOL_SIZE              (512*2048*8)
- /** Packet pool buffer size. */
- #define SHM_PKT_POOL_BUFFER_SIZE       1856
- /** Packet pool user area size. */
- #define SHM_PKT_POOL_USER_AREA_SIZE    16
+sudo mkdir /mnt/huge
+sudo mount -t hugetlbfs nodev /mnt/huge
 
- /**Maximum number of sockets. */
--#define OFP_NUM_SOCKETS_MAX 1024
-+#define OFP_NUM_SOCKETS_MAX 60000
+sudo /sbin/modprobe uio
+ulimit -Sn 2048
 
- /**Maximum number of fastpath interfaces used.
-  * For each fastpath interface a PKTIO in opened by OFP.*/
-diff --git a/src/ofp_tcp_timewait.c b/src/ofp_tcp_timewait.c
-index caf3d33..0ecd632 100644
---- a/src/ofp_tcp_timewait.c
-+++ b/src/ofp_tcp_timewait.c
-@@ -78,6 +78,7 @@ tcptw_auto_size(void)
- {
-        int halfrange;
+insmod scripts/dpdk/x86_64-native-linuxapp-gcc/kmod/igb_uio.ko
 
-+       return OFP_NUM_SOCKETS_MAX;
-        /*
-         * Max out at half the ephemeral port range so that TIME_WAIT
-         * sockets don't tie up too many ephemeral ports.
------
+	Configure interfaces:
 
+./tools/dpdk_nic_bind.py --status
+
+Network devices using DPDK-compatible driver ============================================
+<none>
+
+Network devices using kernel driver
+===================================
+0000:02:00.0 'I350 Gigabit Network Connection' if=p1p1 drv=igb unused=igb_uio *Active*
+0000:02:00.1 'I350 Gigabit Network Connection' if=p1p2 drv=igb unused=igb_uio
+0000:81:00.0 '82599ES 10-Gigabit SFI/SFP+ Network Connection' if=eth0 drv=ixgbe unused=igb_uio *Active*
+0000:81:00.1 '82599ES 10-Gigabit SFI/SFP+ Network Connection' if=eth1 drv=ixgbe unused=igb_uio *Active*
+
+Other network devices
+=====================
+<none>
+
+
+$ sudo ifconfig eth0 down
+sudo ./tools/dpdk_nic_bind.py -u 0000:01:00.0
+sudo ./tools/dpdk_nic_bind.py --bind=igb_uio 0000:01:00.0
+
+$ ./tools/dpdk_nic_bind.py --status
+Network devices using DPDK-compatible driver ============================================
+0000:81:00.0 '82599ES 10-Gigabit SFI/SFP+ Network Connection' drv=igb_uio unused=
+0000:81:00.1 '82599ES 10-Gigabit SFI/SFP+ Network Connection' drv=igb_uio unused=
+
+Network devices using kernel driver
+===================================
+0000:02:00.0 'I350 Gigabit Network Connection' if=p1p1 drv=igb unused=igb_uio *Active*
+0000:02:00.1 'I350 Gigabit Network Connection' if=p1p2 drv=igb unused=igb_uio
+
+Other network devices
+=====================
+<none>
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PATH_OFP_ROOT/scripts/check-odp/new-build/lib/
+
+export ODP_PLATFORM_PARAMS="-n 4 -- -p 4"
 
 1. Preparing build
 ==================
 
-set build variables with respective OFP and odp build path
-export OFP_PATH=/home/kapilhali/odp/ofp/ofp/out
-export OFP_ODP=/home/kapilhali/odp/odp/out
+set build variables with respective OFP and ODP build path (see 0.1.)
+export OFP_PATH=$PATH_OFP_ROOT/scripts/check-odp/new-build/
+export OFP_ODP=$PATH_OFP_ROOT/scripts/check-odp/new-build/
 
-./configure --sbin-path=/usr/local/nginx/nginx --conf-path=/usr/local/nginx/nginx.conf --pid-path=/usr/local/nginx/nginx.pid --with-http_ssl_module --with-debug --with-select_module
+export RTE_SDK=$PATH_OFP_ROOT/scripts/dpdk/
+export RTE_TARGET=x86_64-native-linuxapp-gcc
 
+./configure --sbin-path=/usr/local/nginx_dpdk/nginx --conf-path=/usr/local/nginx_dpdk/nginx.conf --pid-path=/usr/local/nginx_dpdk/nginx.pid --with-http_ssl_module --with-select_module
+[--without-http_rewrite_module]
 
 make install
 
@@ -72,143 +92,50 @@ It would be useful to save the above build steps in a script and run the script.
 2. Configuring NGINX 
 ====================
 
-After build and install, NGINX configuration file will be at /usr/local/nginx/nginx.conf 
-Change as mentioned below.
-
------
-diff --git a/conf/nginx.conf b/conf/nginx.conf
-index 29bc085..8421146 100644
---- a/conf/nginx.conf
-+++ b/conf/nginx.conf
-@@ -5,12 +5,14 @@ worker_processes  1;
- #error_log  logs/error.log;
- #error_log  logs/error.log  notice;
- #error_log  logs/error.log  info;
-+#error_log  logs/error.log  debug;
- 
- #pid        logs/nginx.pid;
--
-+daemon off;
- 
- events {
-     worker_connections  1024;
-+    use select;
- }
-
-
-@@ -27,8 +30,8 @@ http {
-     sendfile        on;
-     #tcp_nopush     on;
- 
--    #keepalive_timeout  0;
--    keepalive_timeout  65;
-+    keepalive_timeout  0;
-+    #keepalive_timeout  65;
- 
-     #gzip  on;
-
------
+After build and install, NGINX configuration file will be at /usr/local/nginx_dpdk/nginx.conf.
 
 To get NGINX debug logs uncomment the debug line
  error_log  logs/error.log  debug
 
-Debug logs will be in /usr/local/nginx/logs/error.log
+To run more on more cores increase the number of worker processes:
+ worker_processes  number;
+For now, one also needs to change in code:
+--- a/src/event/modules/ngx_ofp_module.c
++++ b/src/event/modules/ngx_ofp_module.c
+@@ -44,7 +44,7 @@
+ #include <sys/syscall.h>
+ #include <dlfcn.h>
 
+-#define NUM_QUEUES 1
++#define NUM_QUEUES 3
+ #define ODP_FD_BITS 30
+
+ #include <getopt.h>
+
+Debug logs will be in /usr/local/nginx_dpdk/logs/error.log
 
 3. Running NGINX
 ================
 
+Be sure you have configured DPDK and interfaces as explained at 0.2.
+
 In conf/ofp.conf file, configure the ip address for fp0 interface.
 
-Enable hugepages for ODP using the command below
+To start webserver:
+ sh start_nginx.sh 0
 
-echo 1024 > /proc/sys/vm/nr_hugepages
-
-Below is start_nginx.sh script
-
------
-
-root@Linaro:/home/nginx# cat start_nginx.sh 
-#!/bin/bash
-
-app="nginx"
-
-if [ "$#" -ne 1 ]; then
-    echo "requires interface parameter. Use: ./start_$app.sh ethX"
-    exit -1
-fi
-
-intf=$1
-echo Starting $app on interface $intf
-
-/usr/local/nginx/nginx &
-
-#sleep 1
-#ifconfig fp0 $2
-#sleep 1
-
-iptables -A FORWARD -i $intf -j DROP
-iptables -A INPUT -i $intf -j DROP
-ip6tables -A FORWARD -i $intf -j DROP
-ip6tables -A INPUT -i $intf -j DROP
-ifconfig $intf -arp
-ip addr flush dev $intf
-
------
-
-
-Below is stop_nginx.sh script
-
------
-
-root@Linaro:/home/nginx# cat stop_nginx.sh 
-#!/bin/bash
-if [ "$#" -ne 1 ]; then
-    echo "requires an interface parameter. Use: ./start_webserver.sh ethX"
-    exit -1
-fi
-
-intf=$1
-if test "X$intf" = "X"; then intf=eth0; fi
-
-app="nginx"
-echo "Stopping $app"
-
-kill -9 `cat /usr/local/nginx/nginx.pid`
-
-ps -eL | grep nginx | awk '{print $1}' | xargs kill -9
-
-ifconfig $intf down
-iptables -D FORWARD -i $intf -j DROP
-iptables -D INPUT - i $intf -j DROP
-ip6tables -D FORWARD -i $intf -j DROP
-ip6tables -D INPUT -i $intf -j DROP
-ifconfig $intf arp
-
-ifconfig eth0 192.168.1.4/24 up
-mv /usr/local/nginx/nginx.pid /usr/local/nginx/nginx.pid.bk
-
-----
-
-To start webserver
-
-root@Linaro:/home/nginx# sh start_nginx.sh eth0
-
-To stop webserver 
-
-root@Linaro:/home/nginx# sh stop_nginx.sh eth0
-
+To stop webserver:
+ sh stop_nginx.sh 0
 
 From some other machine try to ping the IP we have set for fp0 interface.
 If ping works, then open a web browser and try to access the same ip address.
 If web page loads successfully, webserver with OFP is working.
 
 
-
 4. Limitations or Known Issues
 ==============================
 
-a) Current NGINX/OFP implementation assumes interface as eth0. 
+a) Current NGINX/OFP implementation assumes interface as 0.
 It will not work for other interfaces.
 
 b) Running with keepalive timeout other than zero causing issue
