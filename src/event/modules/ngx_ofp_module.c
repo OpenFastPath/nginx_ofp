@@ -276,7 +276,7 @@ static void print_info(char *progname, appl_args_t *appl_args)
 		"---------------\n"
 		"ODP API version: %s\n"
 		"CPU model:       %s\n"
-		"CPU freq (hz):   %"PRIu64"\n"
+		"CPU freq (hz):   %lu\n"
 		"Cache line size: %i\n"
 		"Core count:      %i\n"
 		"\n",
@@ -521,6 +521,8 @@ int close(int fd)
 		fd &= ~(1 << ODP_FD_BITS);
 		return ofp_close(fd);
 	} else {
+		if (real_close == NULL)
+			real_close = dlsym(RTLD_NEXT, "close");
 		return real_close(fd);
 	}
 }
