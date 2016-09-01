@@ -329,14 +329,20 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
                 ofp_packet_input(odp_pkt, ODP_QUEUE_INVALID, ofp_eth_vlan_processing);
         }
 
-	odp_queue_t timer_queue = ofp_timer_queue_cpu(odp_cpu_id());
-	odp_event_t event = odp_queue_deq(timer_queue);
+	static uint32_t count = 0;
+	/*odp_queue_deq has a lock that impacts performance*/
+	if (count ++ > 50) {
+		count = 0;
 
-	if (event != ODP_EVENT_INVALID) {
-		if (odp_event_type(event) == ODP_EVENT_TIMEOUT) {
-			ofp_timer_handle(event);
-		} else {
-			odp_buffer_free(odp_buffer_from_event(event));
+		odp_queue_t timer_queue = ofp_timer_queue_cpu(odp_cpu_id());
+		odp_event_t event = odp_queue_deq(timer_queue);
+
+		if (event != ODP_EVENT_INVALID) {
+			if (odp_event_type(event) == ODP_EVENT_TIMEOUT) {
+				ofp_timer_handle(event);
+			} else {
+				odp_buffer_free(odp_buffer_from_event(event));
+			}
 		}
 	}
 
