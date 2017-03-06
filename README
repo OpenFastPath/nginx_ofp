@@ -99,18 +99,9 @@ To get NGINX debug logs uncomment the debug line
 
 To run more on more cores increase the number of worker processes:
  worker_processes  number;
-For now, one also needs to change in code:
---- a/src/event/modules/ngx_ofp_module.c
-+++ b/src/event/modules/ngx_ofp_module.c
-@@ -44,7 +44,7 @@
- #include <sys/syscall.h>
- #include <dlfcn.h>
 
--#define NUM_QUEUES 1
-+#define NUM_QUEUES 3
- #define ODP_FD_BITS 30
-
- #include <getopt.h>
+One also needs to set the NUM_QUEUES environment variable to the same
+value as worker_processes (see 3. Running NGINX).
 
 Debug logs will be in /usr/local/nginx_dpdk/logs/error.log
 
@@ -120,6 +111,10 @@ Debug logs will be in /usr/local/nginx_dpdk/logs/error.log
 Be sure you have configured DPDK and interfaces as explained at 0.2.
 
 In conf/ofp.conf file, configure the ip address for fp0 interface.
+
+When using more than one worker, set NUM_QUEUES in start_nginx.sh
+(uncomment the export command) to the same value as worker_processes
+in nginx.conf.
 
 To start webserver:
  sh start_nginx.sh 0

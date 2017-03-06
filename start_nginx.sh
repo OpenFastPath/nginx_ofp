@@ -10,6 +10,8 @@ fi
 intf=$1
 echo Starting $app on interface $intf
 
+#export NUM_QUEUES=1
+
 /usr/local/nginx_dpdk/nginx &
 
 #sleep 1

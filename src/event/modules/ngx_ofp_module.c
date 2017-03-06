@@ -44,7 +44,6 @@
 #include <sys/syscall.h>
 #include <dlfcn.h>
 
-#define NUM_QUEUES 1
 #define ODP_FD_BITS 30
 
 #include <getopt.h>
@@ -170,7 +169,9 @@ int my_webserver(int if_count, char **if_name)
         pktin_param.op_mode = ODP_PKTIO_OP_MT_UNSAFE;
         pktin_param.hash_enable = 1;
         pktin_param.hash_proto.all_bits = 7;
-        pktin_param.num_queues = NUM_QUEUES;
+        pktin_param.num_queues = 1;
+        char *num_queues_str = getenv("NUM_QUEUES");
+        if (num_queues_str) pktin_param.num_queues = atoi(num_queues_str);
 
         odp_pktout_queue_param_init(&pktout_param);
         pktout_param.num_queues = odp_cpu_count();
