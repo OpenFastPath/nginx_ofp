@@ -112,10 +112,20 @@ static void sigev_notify(union ofp_sigval sv)
                 break;
             }
         }
+	return;
     }
 
-    if (event != OFP_EVENT_RECV) {
-        goto end;
+    if (event == OFP_EVENT_SEND)  {
+	    for (i = 0; i < nevents; i++) {
+		    ev = event_index[i];
+		    c = ev->data;
+		    if (ev->write && CLR_FD_BIT(c->fd)==s) {
+			    OFP_DBG("%s: posted SEND event on fd=%d", __func__, s);
+			    ev->ready = 1;
+			    ngx_post_event(ev, &ngx_posted_events);
+		    }
+	    }
+	    return;
     }
 
     int r = odp_packet_len(pkt);
