@@ -339,6 +339,8 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
                 ofp_packet_input(odp_pkt, ODP_QUEUE_INVALID, ofp_eth_vlan_processing);
         }
 
+	if (pkt_cnt < 1) ofp_send_pending_pkt();
+
 	static uint32_t count = 0;
 	/*odp_queue_deq has a lock that impacts performance*/
 	if (count ++ > 50) {
