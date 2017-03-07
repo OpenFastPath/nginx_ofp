@@ -344,7 +344,7 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 	if (count ++ > 50) {
 		count = 0;
 
-		odp_queue_t timer_queue = ofp_timer_queue_cpu(odp_cpu_id());
+		odp_queue_t timer_queue = ofp_timer_queue_cpu(-1);
 		odp_event_t event = odp_queue_deq(timer_queue);
 
 		if (event != ODP_EVENT_INVALID) {
