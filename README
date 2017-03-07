@@ -13,7 +13,16 @@
 0. Prerequisites
 ================
 
-0.1. Get latest OFP to your $PATH_OFP_ROOT and run ./scripts/devbuild_ofp_odp_dpdk.sh
+0.1. Build Prerequisites:
+
+- Get latest OFP to your $PATH_OFP_ROOT.
+
+- Add the following options to the ./configure command in
+  scripts/devbuild_ofp_odp_dpdk.sh:
+	--enable-sp=no --with-config-flv=webserver
+
+- Run scripts/devbuild_ofp_odp_dpdk.sh.
+
 This builds and installs DPDK, ODP-DPDK and OFP.
 
 0.2. Configure DPDK:
