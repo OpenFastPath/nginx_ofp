@@ -23,6 +23,7 @@
 #endif
 
 #include <sys/time.h>
+#include <netinet/tcp.h>
 #include "ofp.h"
 #include "odp.h"
 #include "ofp_errno.h"
@@ -430,6 +431,15 @@ int setsockopt (int __fd, int __level, int __optname,
 {
 	if (__fd & (1 << ODP_FD_BITS)) {
 		__fd &= ~(1 << ODP_FD_BITS);
+		if (__level == SOL_TCP) {
+			switch (__optname) {
+			case TCP_CORK:
+				__optname = OFP_TCP_CORK;
+				break;
+			default:
+				return 0;
+			}
+		}
 		return ofp_setsockopt(__fd, __level, __optname, __optval, __optlen);
 	} else {
 		return real_setsockopt(__fd, __level, __optname, __optval, __optlen);

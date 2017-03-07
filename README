@@ -133,9 +133,9 @@ If web page loads successfully, webserver with OFP is working.
 a) Current NGINX/OFP implementation assumes interface as 0.
 It will not work for other interfaces.
 
-b) Running with keepalive timeout other than zero causing issue
-while more connection requests are triggered. To avoid this
-Configure keepalive_timeout to zero in conf file.
+b) NGINX option tcp_nodelay has no effect. To avoid low request rates,
+sendfile and tcp_nopush should be enabled, as in the provided
+nginx.conf file.
 
 
 5. Changelog
