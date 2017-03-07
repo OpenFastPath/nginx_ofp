@@ -585,64 +585,63 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
 
 
 
-#define BUF_SIZE 1024
-
-#define min(m,n) ((m) < (n) ? (m) : (n))
-#define max(m,n) ((m) > (n) ? (m) : (n))
+#define BUF_SIZE (1<<14)
 
 ssize_t sendfile64(int out_fd, int in_fd, off_t *offset, size_t count)
 {
 	off_t orig = 0;
 	char buf[BUF_SIZE];
-	size_t to_read,  total_sent;
+	size_t total_sent = 0;
 	int num_sent, num_read;
-	ssize_t rc = 0;
+	int ret_err = 0;
 
 	if (out_fd & (1 << ODP_FD_BITS))
 	{
 		out_fd &= ~(1 << ODP_FD_BITS);
 
-		if (offset != NULL) {
-			orig = lseek(in_fd, 0, SEEK_CUR);
-			if (orig == -1)
-				return -1;
-			if (lseek(in_fd, *offset, SEEK_SET) == -1)
-				return -1;
-		}
+		errno = 0;
 
-		total_sent = 0;
+		if ((orig = lseek(in_fd, 0, SEEK_CUR)) < 0) return -1;
+
+		if (offset && lseek(in_fd, *offset, SEEK_SET) < 0) return -1;
 
 		while (count > 0) {
-			to_read = min(BUF_SIZE, count);
+			int to_read = count < BUF_SIZE ? count : BUF_SIZE;
 			num_read = read(in_fd, buf, to_read);
-			if (num_read == -1)
+
+			if (num_read < 1) {
+				if (total_sent) break;
 				return -1;
-			if (num_read == 0)
-				break;				/* EOF */
+			}
 
 			num_sent = ofp_send(out_fd, buf, num_read, 0);
-			if (num_sent == -1)
-				return -1;
-			if (num_sent == 0)
-				printf("sendfile64: transferred 0 bytes\n");
+
+			if (num_sent < 1) {
+				if (total_sent) break;
+				if (ofp_errno==OFP_EAGAIN || ofp_errno==OFP_ENOBUFS)
+					errno = EAGAIN;
+				ret_err = 1;
+				break;
+			}
+
+			total_sent += num_sent;
+
+			if (num_sent != num_read) break;
 
 			count -= num_sent;
-			total_sent += num_sent;
 		}
 
-		if (offset != NULL) {
-			*offset = lseek(in_fd, 0, SEEK_CUR);
-			if (*offset == -1)
-				return -1;
-			if (lseek(in_fd, orig, SEEK_SET) == -1)
-				return -1;
+		if (offset) {
+			*offset += total_sent;
+			if (lseek(in_fd, orig, SEEK_SET) < 0) return -1;
+		} else {
+			if (lseek(in_fd, orig+total_sent, SEEK_SET) < 0) return -1;
 		}
+
+		if (ret_err) return -1;
 
 		return total_sent;
-
-	} else {
-		rc = real_sendfile64( out_fd, in_fd, offset, count);
 	}
-	return rc;
 
+	return real_sendfile64( out_fd, in_fd, offset, count);
 }
