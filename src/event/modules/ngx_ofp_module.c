@@ -558,31 +558,20 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
 			{
 				nwrite = ofp_send(fd, buf + data_size - n, n, 0);
 
-				if(nwrite<=0)
-				{
-					if(errno==OFP_EAGAIN)
-					{
-						usleep(200);
-						continue;
-					}
-					else
-					{
-						return(nwrite);
-					}
+				if (nwrite > 0) rc += nwrite;
+
+				if (rc && nwrite < n) return rc;
+
+				if (nwrite < 0) {
+					errno = 0;
+					if (ofp_errno==OFP_EAGAIN || ofp_errno==OFP_ENOBUFS)
+						errno = EAGAIN;
 				}
 
-				if (nwrite < n)
-				{
-					usleep(200);
-				}
+				if (nwrite <= 0) return nwrite;
+
 				n -= nwrite;
-
 			}
-
-			if (nwrite <= 0)
-				return nwrite;
-
-			rc += data_size;
 		}
 	}
 	else
