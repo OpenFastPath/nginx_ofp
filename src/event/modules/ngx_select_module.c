@@ -147,7 +147,6 @@ static void sigev_notify(union ofp_sigval sv)
         ss->pkt = ODP_PACKET_INVALID;
     }
 
-end:
     return;
 }
 #endif
