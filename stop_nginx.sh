@@ -10,7 +10,7 @@ if test "X$intf" = "X"; then intf=eth0; fi
 app="nginx"
 echo "Stopping $app"
 
-kill -9 `cat /usr/local/nginx_dpdk/nginx.pid`
+kill -9 `cat %%NGX_PID_PATH%%`
 
 ps -e | grep '\s\+nginx$' | awk '{print $1}' | xargs kill -9
 
@@ -22,4 +22,4 @@ ps -e | grep '\s\+nginx$' | awk '{print $1}' | xargs kill -9
 #ifconfig $intf arp
 #
 #ifconfig eth0 192.168.1.4/24 up
-mv /usr/local/nginx_dpdk/nginx.pid /usr/local/nginx_dpdk/nginx.pid.bk
+mv %%NGX_PID_PATH%% %%NGX_PID_PATH%%.bk
