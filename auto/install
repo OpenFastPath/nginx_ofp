@@ -154,6 +154,7 @@ install:	$NGX_OBJS${ngx_dirsep}nginx${ngx_binext} \
 	sed -e "s|%%NGX_PID_PATH%%|$NGX_PID_PATH|" stop_nginx.sh > \
 		'\$(DESTDIR)$NGX_SBIN_PREFIX/stop_nginx.sh'
 	chmod u+x '\$(DESTDIR)$NGX_SBIN_PREFIX/stop_nginx.sh'
+	cp conf/ofp.conf '\$(DESTDIR)$NGX_CONF_PREFIX'
 END
 
 
