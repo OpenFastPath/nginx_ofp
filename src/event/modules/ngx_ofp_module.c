@@ -24,6 +24,7 @@
 
 #include <sys/time.h>
 #include <netinet/tcp.h>
+#include <ngx_auto_config.h>
 #include "ofp.h"
 #include "odp.h"
 #include "ofp_errno.h"
@@ -231,18 +232,24 @@ static void parse_args(int argc, char *argv[], appl_args_t *appl_args)
 		calloc(appl_args->if_count, sizeof(char *));
 	appl_args->if_names = argv;
 
-	char filename[]="./conf/ofp.conf";
-	int len = strlen(filename);
-	printf("len : %x, file : %s\n", len, filename);
-	len += 1;	/* add room for '\0' */
-
-	appl_args->conf_file = malloc(len);
-	if (appl_args->conf_file == NULL) {
+	char *filename = malloc(sizeof(NGX_CONF_PATH) + 1);
+	if (filename == NULL) {
+		fprintf(stderr, "Could not allocate memory\n");
 		usage(argv[0]);
 		exit(EXIT_FAILURE);
 	}
+	strcpy(filename, NGX_CONF_PATH);
+	char *slash = strrchr(filename, '/');
 
-	strcpy(appl_args->conf_file, filename);
+	/* IN MOST CASES this replaces /nginx.conf, which is longer than
+	 * /ofp.conf, so we should be safe, except when the user gives the file
+	 * a shorter name, in which case the buffer overflow is deserved */
+	strcpy(slash, "/ofp.conf");
+
+	int len = strlen(filename);
+	printf("len : %x, file : %s\n", len, filename);
+
+	appl_args->conf_file = filename;
 }
 
 /**
