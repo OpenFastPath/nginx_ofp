@@ -37,6 +37,7 @@ esac
 
 
 NGX_CONF_PREFIX=`dirname $NGX_CONF_PATH`
+NGX_SBIN_PREFIX=`dirname $NGX_SBIN_PATH`
 
 
 case ".$NGX_PID_PATH" in
@@ -145,6 +146,14 @@ install:	$NGX_OBJS${ngx_dirsep}nginx${ngx_binext} \
 
 	test -d '\$(DESTDIR)$NGX_PREFIX/html' \
 		|| cp -R $NGX_HTML '\$(DESTDIR)$NGX_PREFIX'
+
+	sed -e "s|%%NGX_SBIN_PATH%%|$NGX_SBIN_PREFIX|" \
+	    -e "s|%%NGX_CONF_PREFIX%%|$NGX_CONF_PREFIX|" start_nginx.sh > \
+		'\$(DESTDIR)$NGX_SBIN_PREFIX/start_nginx.sh'
+	chmod u+x '\$(DESTDIR)$NGX_SBIN_PREFIX/start_nginx.sh'
+	sed -e "s|%%NGX_PID_PATH%%|$NGX_PID_PATH|" stop_nginx.sh > \
+		'\$(DESTDIR)$NGX_SBIN_PREFIX/stop_nginx.sh'
+	chmod u+x '\$(DESTDIR)$NGX_SBIN_PREFIX/stop_nginx.sh'
 END
 
 
