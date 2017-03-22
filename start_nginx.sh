@@ -10,7 +10,14 @@ fi
 intf=$1
 echo Starting $app on interface $intf
 
-#export NUM_QUEUES=1
+# Find number of queues from config file
+CONFIG_FILE=/usr/local/nginx_dpdk/nginx.conf
+line=$(grep -m 1 '^\s*worker_processes' $CONFIG_FILE)
+if [ -n "$line" ]; then
+    NUM_QUEUES=$(echo $line | sed -r 's/^\s*worker_processes\s+([0-9])\s*;/\1/')
+    echo "Found $NUM_QUEUES worker_processes"
+    export NUM_QUEUES
+fi
 
 /usr/local/nginx_dpdk/nginx &
 
