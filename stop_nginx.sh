@@ -12,7 +12,7 @@ echo "Stopping $app"
 
 kill -9 `cat /usr/local/nginx_dpdk/nginx.pid`
 
-ps -eL | grep nginx | awk '{print $1}' | xargs kill -9
+ps -e | grep '\s\+nginx$' | awk '{print $1}' | xargs kill -9
 
 #ifconfig $intf down
 #iptables -D FORWARD -i $intf -j DROP
