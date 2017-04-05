@@ -195,11 +195,12 @@ void
 ngx_process_events_and_timers(ngx_cycle_t *cycle)
 {
     ngx_uint_t  flags;
-    ngx_msec_t  timer, delta;
+    ngx_msec_t  timer;
+    static ngx_msec_t delta = 0;
 
     if (1) {
         timer = NGX_TIMER_INFINITE;
-        flags = 0;
+        flags = NGX_UPDATE_TIME;
 
     } else {
         timer = ngx_event_find_timer();
@@ -238,7 +239,6 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
         }
     }
 
-    delta = ngx_current_msec;
 
     (void) ngx_process_events(cycle, timer, flags);
 
@@ -255,6 +255,7 @@ ngx_process_events_and_timers(ngx_cycle_t *cycle)
 
     if (delta) {
         ngx_event_expire_timers();
+        delta = ngx_current_msec;
     }
 
     ngx_event_process_posted(cycle, &ngx_posted_events);

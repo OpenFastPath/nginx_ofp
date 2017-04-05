@@ -358,6 +358,10 @@ ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
 	}
 
 #if OFP_NOTIFY
+    if (flags & NGX_UPDATE_TIME || ngx_event_timer_alarm) {
+        ngx_time_update();
+    }
+    
     return NGX_OK;
 #endif
     int                ready, nready;
