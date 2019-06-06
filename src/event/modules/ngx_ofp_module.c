@@ -144,8 +144,8 @@ int my_webserver(int if_count, char **if_name)
 	odp_cpumask_t cpumask;
 	char cpumaskstr[64];
 	odp_pktio_param_t pktio_param;
-        odp_pktin_queue_param_t pktin_param;
-        odp_pktout_queue_param_t pktout_param;
+	odp_pktin_queue_param_t pktin_param;
+	odp_pktout_queue_param_t pktout_param;
 
 	struct rlimit rlp;
 	getrlimit(RLIMIT_CORE, &rlp);
@@ -161,7 +161,22 @@ int my_webserver(int if_count, char **if_name)
 		OFP_ERR("Error: ODP global init failed.\n");
 		exit(EXIT_FAILURE);
 	}
-	odp_init_local(instance, ODP_THREAD_CONTROL);
+	if (odp_init_local(instance, ODP_THREAD_CONTROL)) {
+		OFP_ERR("Error: ODP local init failed.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	ofp_init_global_param(&app_init_params);
+	app_init_params.pkt_hook[OFP_HOOK_LOCAL] = fastpath_local_hook;
+
+	if (ofp_init_global(instance, &app_init_params)) {
+		OFP_ERR("Error: OFP global init failed.\n");
+		exit(EXIT_FAILURE);
+	}
+	if (ofp_init_local()) {
+		OFP_ERR("Error: OFP local init failed.\n");
+		exit(EXIT_FAILURE);
+	}
 
 	core_count = odp_cpu_count();
 	num_workers = core_count;
@@ -175,10 +190,6 @@ int my_webserver(int if_count, char **if_name)
 	 * By default core #0 runs Linux kernel background tasks.
 	 * Start mapping thread from core #1
 	 */
-	memset(&app_init_params, 0, sizeof(app_init_params));
-
-	app_init_params.linux_core_id = 0;
-
 	if (core_count > 1)
 		num_workers--;
 
@@ -189,23 +200,12 @@ int my_webserver(int if_count, char **if_name)
 	printf("first CPU:          %i\n", odp_cpumask_first(&cpumask));
 	printf("cpu mask:           %s\n", cpumaskstr);
 
-	app_init_params.if_count = 0;
-	app_init_params.if_names = 0;
-	app_init_params.pkt_hook[OFP_HOOK_LOCAL] = fastpath_local_hook;
-	/*app_init_params.burst_recv_mode = 1;*/
-	if(ofp_init_global(instance, &app_init_params) < 0) {
-		printf("%s: ofp_init_global failed\n", __func__);
-		exit(0);
-	}
-
 	odp_pktio_param_init(&pktio_param);
         pktio_param.in_mode = ODP_PKTIN_MODE_DIRECT;
         pktio_param.out_mode = ODP_PKTOUT_MODE_DIRECT;
 
         odp_pktin_queue_param_init(&pktin_param);
         pktin_param.op_mode = ODP_PKTIO_OP_MT_UNSAFE;
-        pktin_param.hash_enable = 1;
-        pktin_param.hash_proto.all_bits = 7;
         pktin_param.num_queues = 1;
         char *num_queues_str = getenv("NUM_QUEUES");
         if (num_queues_str) pktin_param.num_queues = atoi(num_queues_str);
@@ -240,8 +240,6 @@ int my_webserver(int if_count, char **if_name)
 
 	OFP_INFO("HTTP thread started");
 
-	//odp_init_local(ODP_THREAD_CONTROL);
-	ofp_init_local();
 	sleep (1);
 
 	//odph_linux_pthread_join(thread_tbl, num_workers);
