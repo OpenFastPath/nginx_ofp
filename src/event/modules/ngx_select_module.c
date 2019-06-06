@@ -10,6 +10,8 @@
 #include <ngx_event.h>
 #include <ofp.h>
 
+#define PKT_BURST_SIZE 16
+
 static ngx_int_t ngx_select_init(ngx_cycle_t *cycle, ngx_msec_t timer);
 static void ngx_select_done(ngx_cycle_t *cycle);
 static ngx_int_t ngx_select_add_event(ngx_event_t *ev, ngx_int_t event,
@@ -326,12 +328,12 @@ static ngx_int_t
 ngx_select_process_events(ngx_cycle_t *cycle, ngx_msec_t timer,
     ngx_uint_t flags)
 {
-	odp_packet_t pkts[OFP_PKT_RX_BURST_SIZE];
+	odp_packet_t pkts[PKT_BURST_SIZE];
         odp_packet_t odp_pkt;
         int pkt_cnt = 0;
         int pkt_idx = 0;
 
-	pkt_cnt = odp_pktin_recv(in_queue, pkts, OFP_PKT_RX_BURST_SIZE);
+	pkt_cnt = odp_pktin_recv(in_queue, pkts, PKT_BURST_SIZE);
 
         for (pkt_idx = 0; pkt_idx < pkt_cnt; pkt_idx++) {
                 odp_pkt = pkts[pkt_idx];
