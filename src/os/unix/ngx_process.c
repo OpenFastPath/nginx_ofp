@@ -443,6 +443,7 @@ ngx_signal_handler(int signo)
                 break;
             }
             ngx_debug_quit = 1;
+            /* Fall through */
         case ngx_signal_value(NGX_SHUTDOWN_SIGNAL):
             ngx_quit = 1;
             action = ", shutting down";
