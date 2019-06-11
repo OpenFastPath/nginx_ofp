@@ -15,7 +15,7 @@
 
 0.1. Build Prerequisites:
 
-- Get latest OFP to your $PATH_OFP_ROOT.
+- Get OFP (tested with version 3.0.0) to your $PATH_OFP_ROOT.
 
 - Add the following options to the ./configure command in
   scripts/devbuild_ofp_odp_dpdk.sh:
